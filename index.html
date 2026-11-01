@@ -175,7 +175,7 @@ async function move(steps){
   if(tile.type==='key'){
     const before=S.score[t];
     S.score[t]+=KEY_POINTS;S.shown=null;S.phase='result';
-    S.msg=`🔑 황금열쇠! +${KEY_POINTS}점 (이벤트는 직접 진행하세요)`;
+    S.msg=`🔑 황금열쇠! +${KEY_POINTS}점`;
   }
   else if(dest===0||total===0){S.shown=null;S.phase='result';S.msg=dest===0?'출발 칸입니다. 쉬어갑니다.':'문제가 없는 칸입니다. 쉬어갑니다.';}
   else if(done>=total){
