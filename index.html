@@ -76,7 +76,7 @@ header button,header .btn{padding:6px 12px;font-size:14px}
 
 <script>
 const KEY='bg_state', CFG_KEY='bg_config', COLORS=['var(--t0)','var(--t1)','var(--t2)','var(--t3)'];
-const KEYS=[{t:'행운의 보너스!',d:5},{t:'선물을 받았어요',d:3},{t:'작은 행운',d:2},{t:'아무 일도 없었습니다',d:0},{t:'간식을 샀어요',d:-1},{t:'수리비 지출',d:-2}];
+const KEY_POINTS=2;
 const $=id=>document.getElementById(id);
 let S=null, busy=false, showAns=false, animPos=null, beeped=false;
 
@@ -173,10 +173,9 @@ async function move(steps){
   const tile=S.cfg.tiles[dest],total=tile.questions.length,done=(S.solved[dest]||[]).length,sc=S.cfg.scoring;
   S.cur=dest;
   if(tile.type==='key'){
-    const k=KEYS[Math.floor(Math.random()*KEYS.length)],before=S.score[t];
-    S.score[t]=Math.max(0,before+k.d);S.shown=null;S.phase='result';
-    const diff=S.score[t]-before;
-    S.msg=`🔑 황금열쇠: ${k.t} (${diff>0?'+':''}${diff}점)`;
+    const before=S.score[t];
+    S.score[t]+=KEY_POINTS;S.shown=null;S.phase='result';
+    S.msg=`🔑 황금열쇠! +${KEY_POINTS}점 (이벤트는 직접 진행하세요)`;
   }
   else if(dest===0||total===0){S.shown=null;S.phase='result';S.msg=dest===0?'출발 칸입니다. 쉬어갑니다.':'문제가 없는 칸입니다. 쉬어갑니다.';}
   else if(done>=total){
