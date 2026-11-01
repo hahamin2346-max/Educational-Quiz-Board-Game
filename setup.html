@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>보드게임 설정 (교사용)</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--ink:#1d2433;--mute:#667085;--line:#d9dde5;--pri:#2f6fed;--ok:#1f9d55;--bad:#d64545}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Malgun Gothic",system-ui,sans-serif}
+header{position:sticky;top:0;z-index:5;background:#1d2433;color:#fff;padding:12px 20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+header h1{font-size:18px;margin:0 auto 0 0}
+main{max-width:1000px;margin:0 auto;padding:16px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+h2{font-size:16px;margin:0 0 12px}
+label{display:block;font-size:13px;color:var(--mute);margin-bottom:3px}
+input,textarea{width:100%;font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+textarea{resize:vertical}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+button,.btn{font:inherit;border:0;border-radius:6px;padding:8px 14px;cursor:pointer;background:var(--pri);color:#fff}
+button.sub,.btn.sub{background:#e7eaf0;color:var(--ink)}
+button.bad{background:var(--bad)}
+details{border:1px solid var(--line);border-radius:8px;margin-bottom:8px;background:#fafbfc}
+summary{cursor:pointer;padding:9px 12px;font-weight:600;display:flex;gap:8px;align-items:center}
+summary .badge{margin-left:auto;font-weight:400;font-size:12px;color:var(--mute)}
+summary .badge.full{color:var(--ok);font-weight:600}
+.tilebody{padding:4px 12px 12px}
+.qrow{display:grid;grid-template-columns:24px 1fr 200px;gap:8px;margin-top:8px;align-items:start}
+.qrow span{color:var(--mute);padding-top:7px}
+.hint{color:var(--mute);font-size:13px;margin:6px 0 0}
+.msg{margin-left:8px;font-size:13px}
+@media(max-width:700px){.qrow{grid-template-columns:24px 1fr}.qrow input:last-child{grid-column:2}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎲 보드게임 설정 (교사용)</h1>
+  <button class="sub" id="btnSample">샘플 채우기</button>
+  <label class="btn sub" style="margin:0;color:var(--ink)">JSON 불러오기<input type="file" id="fileIn" accept=".json,application/json" hidden></label>
+  <button id="btnSave">game.json 저장</button>
+  <span class="msg" id="msg"></span>
+</header>
+<main>
+  <section>
+    <h2>기본 설정</h2>
+    <div class="grid">
+      <div><label>게임 제목</label><input id="title"></div>
+      <div><label>전체 게임 시간(분)</label><input id="gameMinutes" type="number" min="1" max="180"></div>
+    </div>
+    <p class="hint" id="tileInfo"></p>
+  </section>
+
+  <section>
+    <h2>모둠 이름 (4팀)</h2>
+    <div class="grid" id="teams"></div>
+  </section>
+
+  <section>
+    <h2>점수 규칙</h2>
+    <div class="grid">
+      <div><label>첫 번째로 맞힘 (땅 소유)</label><input id="s_first" type="number" min="0"></div>
+      <div><label>2·3번째로 맞힘</label><input id="s_other" type="number" min="0"></div>
+      <div><label>틀렸을 때 감점</label><input id="s_wrong" type="number" min="0"></div>
+      <div><label>문제 소진 칸: 소유주 보너스</label><input id="s_bonus" type="number" min="0"></div>
+      <div><label>문제 소진 칸: 비소유주 감점</label><input id="s_pen" type="number" min="0"></div>
+    </div>
+    <p class="hint">점수는 0점 아래로 내려가지 않습니다.</p>
+  </section>
+
+  <section>
+    <h2>문제 일괄 붙여넣기 (선택)</h2>
+    <p class="hint" style="margin:0 0 8px">엑셀/구글시트에서 <b>칸번호 · 문제 · 정답</b> 3열을 복사해 붙여넣고 [추가]를 누르세요. 칸번호 0은 출발 칸이라 문제를 넣을 수 없습니다. 한 칸에는 최대 3문제까지 들어갑니다.</p>
+    <textarea id="bulk" rows="4" placeholder="1&#9;대한민국의 수도는?&#9;서울"></textarea>
+    <p style="margin:8px 0 0"><button id="btnBulk">추가</button></p>
+  </section>
+
+  <section>
+    <h2>칸별 문제 (칸당 3문제)</h2>
+    <div id="tiles"></div>
+  </section>
+</main>
+
+<script>
+const DRAFT_KEY='bg_setup_draft', CFG_KEY='bg_config';
+const $=id=>document.getElementById(id);
+let cfg=defaults();
+
+function defaults(){return{title:'우리 반 보드게임',cols:6,rows:6,gameMinutes:20,
+  teams:['1모둠','2모둠','3모둠','4모둠'],
+  scoring:{first:5,other:3,wrong:1,ownerBonus:1,nonOwnerPenalty:1},tiles:[]};}
+
+const TOTAL=20, KEY_TILES=[5,10,15];
+function emptyTile(){return{name:'',questions:[{q:'',a:''},{q:'',a:''},{q:'',a:''}]};}
+
+function fitTiles(){
+  cfg.cols=6;cfg.rows=6;
+  while(cfg.tiles.length<TOTAL)cfg.tiles.push(emptyTile());
+  cfg.tiles.length=TOTAL;
+  cfg.tiles.forEach((t,i)=>{
+    if(i===0){t.questions=[];delete t.type;}
+    else if(KEY_TILES.includes(i)){t.type='key';t.name='황금열쇠';t.questions=[];}
+    else{delete t.type;while(t.questions.length<3)t.questions.push({q:'',a:''});t.questions.length=3;}
+  });
+}
+
+function readForm(){
+  cfg.title=$('title').value.trim()||'보드게임';
+  cfg.gameMinutes=clamp(+$('gameMinutes').value||20,1,180);
+  cfg.teams=[...document.querySelectorAll('#teams input')].map((i,k)=>i.value.trim()||(k+1)+'모둠');
+  const s=cfg.scoring;
+  s.first=num('s_first');s.other=num('s_other');s.wrong=num('s_wrong');s.ownerBonus=num('s_bonus');s.nonOwnerPenalty=num('s_pen');
+}
+function num(id){return Math.max(0,+$(id).value||0);}
+function clamp(v,a,b){return Math.min(b,Math.max(a,Math.round(v)||a));}
+
+function writeForm(){
+  $('title').value=cfg.title;$('gameMinutes').value=cfg.gameMinutes||20;
+  $('teams').innerHTML=cfg.teams.map((t,i)=>`<div><label>${i+1}팀</label><input value="${esc(t)}"></div>`).join('');
+  const s=cfg.scoring;
+  $('s_first').value=s.first;$('s_other').value=s.other;$('s_wrong').value=s.wrong;$('s_bonus').value=s.ownerBonus;$('s_pen').value=s.nonOwnerPenalty;
+  renderTiles();
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+
+function renderTiles(){
+  fitTiles();
+  const n=cfg.tiles.length;
+  $('tileInfo').textContent=`보드 20칸 고정: 출발(0번) + 문제 칸 16개 + 황금열쇠 3개(${KEY_TILES.join('·')}번). 필요한 문제 최대 48개`;
+  const open=new Set([...document.querySelectorAll('#tiles details[open]')].map(d=>d.dataset.i));
+  $('tiles').innerHTML=cfg.tiles.map((t,i)=>{
+    if(i===0)return `<details><summary>0번 · 출발 (문제 없음)</summary></details>`;
+    if(t.type==='key')return `<details><summary>${i}번 · 🔑 황금열쇠 (문제 없음)</summary></details>`;
+    const filled=t.questions.filter(x=>x.q.trim()&&x.a.trim()).length;
+    return `<details data-i="${i}" ${open.has(String(i))?'open':''}>
+      <summary>${i}번 칸 <input data-f="name" data-i="${i}" placeholder="칸 이름 입력" value="${esc(t.name)}" style="width:55%;margin:0 8px" onclick="event.preventDefault();event.stopPropagation()" onkeydown="event.stopPropagation()"><span class="badge ${filled===3?'full':''}">${filled}/3 문제</span></summary>
+      <div class="tilebody">
+        ${t.questions.map((x,k)=>`<div class="qrow"><span>${k+1}</span>
+          <input data-f="q" data-i="${i}" data-k="${k}" placeholder="문제" value="${esc(x.q)}">
+          <input data-f="a" data-i="${i}" data-k="${k}" placeholder="정답" value="${esc(x.a)}"></div>`).join('')}
+      </div></details>`;
+  }).join('');
+}
+
+document.addEventListener('input',e=>{
+  const el=e.target,f=el.dataset.f;
+  if(f){
+    const t=cfg.tiles[+el.dataset.i];
+    if(f==='name')t.name=el.value;
+    else t.questions[+el.dataset.k][f]=el.value;
+    updateBadge(el);
+  }else readForm();
+  saveDraft();
+});
+function updateBadge(el){
+  const d=el.closest('details'),i=+el.dataset.i,t=cfg.tiles[i];
+  const filled=t.questions.filter(x=>x.q.trim()&&x.a.trim()).length;
+  const b=d.querySelector('.badge');b.textContent=filled+'/3 문제';b.classList.toggle('full',filled===3);
+}
+
+function saveDraft(){try{localStorage.setItem(DRAFT_KEY,JSON.stringify(cfg));}catch(e){}}
+function flash(t,bad){const m=$('msg');m.textContent=t;m.style.color=bad?'#ff9b9b':'#9be7b4';setTimeout(()=>m.textContent='',4000);}
+
+function validate(c){
+  if(!c||!Array.isArray(c.tiles)||!Array.isArray(c.teams)||!c.scoring)throw new Error('형식이 올바르지 않은 파일입니다.');
+  if(c.tiles.length!==TOTAL)throw new Error('칸 수가 20칸이 아닌 파일입니다.');
+}
+
+let dirHandle=null;
+function idb(mode,fn){return new Promise((res,rej)=>{const r=indexedDB.open('bg_setup',1);
+  r.onupgradeneeded=()=>r.result.createObjectStore('h');
+  r.onsuccess=()=>{const tx=r.result.transaction('h',mode),st=tx.objectStore('h'),q=fn(st);
+    tx.oncomplete=()=>res(q&&q.result);tx.onerror=()=>rej(tx.error);};r.onerror=()=>rej(r.error);});}
+async function saveToFolder(text){
+  if(!window.showDirectoryPicker)return false;
+  try{
+    if(!dirHandle)try{dirHandle=await idb('readonly',s=>s.get('dir'));}catch(e){}
+    if(dirHandle&&(await dirHandle.requestPermission({mode:'readwrite'}))!=='granted')dirHandle=null;
+    if(!dirHandle){dirHandle=await showDirectoryPicker({id:'bgdir',mode:'readwrite'});try{await idb('readwrite',s=>s.put(dirHandle,'dir'));}catch(e){}}
+    const fh=await dirHandle.getFileHandle('game.json',{create:true});
+    const w=await fh.createWritable();await w.write(text);await w.close();
+    return true;
+  }catch(e){if(e.name==='AbortError')throw e;dirHandle=null;return false;}
+}
+
+$('btnSave').onclick=async()=>{
+  readForm();fitTiles();
+  const out=JSON.parse(JSON.stringify(cfg));
+  out.tiles.forEach((t,i)=>{t.questions=t.type==='key'||i===0?[]:t.questions.filter(x=>x.q.trim()&&x.a.trim());});
+  const open=out.tiles.filter(t=>t.type!=='key').slice(1).filter(t=>t.questions.length===0).length;
+  try{localStorage.setItem(CFG_KEY,JSON.stringify(out));}catch(e){}
+  const text=JSON.stringify(out,null,2);
+  let ok=false;
+  try{ok=await saveToFolder(text);}catch(e){return;}
+  if(!ok){
+    const blob=new Blob([text],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='game.json';a.click();
+  }
+  flash((ok?'폴더에 game.json 저장됨':'다운로드로 저장됨')+(open?` (문제 없는 칸 ${open}개)`:''));
+};
+$('fileIn').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{const c=JSON.parse(await f.text());validate(c);cfg=c;if(!cfg.gameMinutes)cfg.gameMinutes=20;delete cfg.timerSec;writeForm();saveDraft();flash('불러왔습니다');}
+  catch(err){flash(err.message,true);}
+  e.target.value='';
+};
+$('btnSample').onclick=()=>{
+  if(!confirm('현재 입력한 문제가 샘플로 덮어쓰기 됩니다. 계속할까요?'))return;
+  readForm();fitTiles();
+  cfg.tiles.forEach((t,i)=>{if(i===0||t.type==='key')return;t.questions=[1,2,3].map(k=>({q:`샘플 ${i}-${k}: ${i}+${k}는?`,a:String(i+k)}));});
+  writeForm();saveDraft();
+};
+$('btnBulk').onclick=()=>{
+  readForm();fitTiles();
+  let added=0,skipped=0;
+  $('bulk').value.split(/\r?\n/).forEach(line=>{
+    if(!line.trim())return;
+    const sep=line.includes('\t')?'\t':',';
+    const p=line.split(sep);
+    const i=parseInt(p[0],10),q=(p[1]||'').trim(),a=p.slice(2).join(sep).trim();
+    if(!(i>=1&&i<cfg.tiles.length)||KEY_TILES.includes(i)||!q||!a){skipped++;return;}
+    const t=cfg.tiles[i];
+    const slot=t.questions.findIndex(x=>!x.q.trim()&&!x.a.trim());
+    if(slot<0){skipped++;return;}
+    t.questions[slot]={q,a};added++;
+  });
+  writeForm();saveDraft();$('bulk').value='';
+  flash(`${added}문제 추가${skipped?`, ${skipped}줄 건너뜀`:''}`,skipped>0);
+};
+
+(function init(){
+  try{const d=localStorage.getItem(DRAFT_KEY);if(d){const c=JSON.parse(d);validate(c);cfg=c;}}catch(e){cfg=defaults();}
+  writeForm();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>문제 소유 보드게임</title>
+<style>
+:root{--bg:#eef1f6;--card:#fff;--ink:#1d2433;--mute:#667085;--line:#cfd5e0;--pri:#2f6fed;--ok:#1f9d55;--bad:#d64545;
+  --t0:#e5484d;--t1:#2f6fed;--t2:#1f9d55;--t3:#e08a00}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 "Malgun Gothic",system-ui,sans-serif}
+button,.btn{font:inherit;border:0;border-radius:8px;padding:9px 16px;cursor:pointer;background:var(--pri);color:#fff}
+button:disabled{opacity:.4;cursor:default}
+button.sub,.btn.sub{background:#e3e7ee;color:var(--ink)}
+button.ok{background:var(--ok)}button.bad{background:var(--bad)}
+header{display:flex;align-items:center;gap:8px;padding:8px 16px;background:#1d2433;color:#fff;flex-wrap:wrap}
+header h1{font-size:18px;margin:0 auto 0 0}
+header button,header .btn{padding:6px 12px;font-size:14px}
+#wrap{display:flex;flex-direction:column;gap:14px;padding:14px}
+#board{min-width:0;display:grid;gap:6px}
+#side{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-items:start}
+.lands{margin:6px 0 0;padding:6px 0 0 0;border-top:1px solid var(--line);list-style:none;font-size:14px;max-height:220px;overflow:auto}
+.lands li{padding:2px 0}
+.tile{position:relative;background:var(--card);border:3px solid var(--line);border-radius:10px;padding:5px 6px;
+  min-height:92px;display:flex;flex-direction:column;overflow:hidden}
+.tile .no{font-size:12px;color:var(--mute);font-weight:700}
+.tile .nm{font-size:13px;font-weight:700;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.tile.start{background:#fff6d6}
+.tile.key{background:#ffe9a8}
+.dots{display:flex;gap:4px;margin-top:auto}
+.dot{width:12px;height:12px;border-radius:50%;border:2px solid #b8c0cf;background:#fff}
+.own{position:absolute;top:0;right:0;width:0;height:0;border-style:solid;border-width:0 26px 26px 0}
+.tokens{display:flex;gap:3px;margin-top:4px;flex-wrap:wrap}
+.tok{width:22px;height:22px;border-radius:50%;color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;box-shadow:0 1px 3px #0005;border:2px solid #fff}
+.tile.cur{box-shadow:0 0 0 3px #ffd54a}
+#center{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:16px 22px;display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto}
+.topbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.who{font-size:22px;font-weight:800;padding:4px 14px;border-radius:999px;color:#fff}
+.gt{display:flex;align-items:center;gap:8px;font-size:14px}
+.gt .t{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;min-width:96px;text-align:center;border-radius:8px;padding:0 6px}
+.gt .t.low{color:#ff8a8a}
+.gt .t.zero{background:var(--bad);animation:bl .6s infinite alternate}
+@keyframes bl{to{opacity:.45}}
+.big{font-size:26px;font-weight:800}
+.q{font-size:30px;font-weight:700;line-height:1.4;padding:14px 18px;background:#f5f7fb;border-radius:10px;white-space:pre-wrap}
+.ans{font-size:24px;padding:10px 16px;border-radius:10px;background:#fff6d6;border:2px dashed #e0b400}
+.dice{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.dice button{font-size:24px;font-weight:800;padding:14px 0;background:#e3e7ee;color:var(--ink)}
+.dice button:hover:not(:disabled){background:var(--pri);color:#fff}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row .grow{flex:1;font-size:22px;padding:14px}
+.mute{color:var(--mute);font-size:14px}
+.team{background:var(--card);border:3px solid var(--line);border-radius:12px;padding:10px 14px}
+.team.on{border-color:#ffd54a;background:#fffbe8}
+.team .nm{display:flex;align-items:center;gap:8px;font-weight:700}
+.team .chip{width:16px;height:16px;border-radius:50%}
+.team .sc{font-size:36px;font-weight:800;line-height:1.1}
+.team .sub2{font-size:13px;color:var(--mute)}
+.rank{display:flex;gap:10px;align-items:center;font-size:22px;padding:8px 0;border-bottom:1px solid var(--line)}
+.modal{position:fixed;inset:0;background:#0007;display:grid;place-items:center;z-index:9}
+.modal>div{background:#fff;border-radius:14px;padding:22px;max-width:420px;width:90%}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">문제 소유 보드게임</h1>
+  <div class="gt">남은 시간 <span class="t" id="gt">20:00</span><button class="sub" id="gtRun" onclick="toggleTimer()">▶</button></div>
+  <button class="sub" id="btnUndo">↶ 되돌리기</button>
+  <button class="sub" id="btnEnd">게임 종료</button>
+  <label class="btn sub" style="margin:0">설정 JSON 변경<input type="file" id="fileIn" accept=".json,application/json" hidden></label>
+  <button class="bad" id="btnReset">게임 초기화</button>
+</header>
+<div id="wrap"><div id="board"></div><div id="side"></div></div>
+<div id="modal"></div>
+
+<script>
+const KEY='bg_state', CFG_KEY='bg_config', COLORS=['var(--t0)','var(--t1)','var(--t2)','var(--t3)'];
+const KEYS=[{t:'행운의 보너스!',d:5},{t:'선물을 받았어요',d:3},{t:'작은 행운',d:2},{t:'아무 일도 없었습니다',d:0},{t:'간식을 샀어요',d:-1},{t:'수리비 지출',d:-2}];
+const $=id=>document.getElementById(id);
+let S=null, busy=false, showAns=false, animPos=null, beeped=false;
+
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const N=()=>S.cfg.tiles.length;
+const team=i=>S.cfg.teams[i];
+
+function validate(c){
+  if(!c||!Array.isArray(c.tiles)||!Array.isArray(c.teams)||c.teams.length<2||!c.scoring)throw new Error('형식이 올바르지 않은 설정 파일입니다.');
+  if(c.cols!==6||c.rows!==6||c.tiles.length!==20||c.tiles.filter(t=>t.type==='key').length!==3)throw new Error('칸 구성이 올바르지 않습니다. (출발 1 + 문제 16 + 황금열쇠 3 = 20칸) 설정 페이지에서 다시 저장해 주세요.');
+}
+const gameSec=cfg=>Math.round((cfg.gameMinutes||20)*60);
+function freshState(cfg){
+  const T=cfg.teams.length;
+  return{cfg,pos:Array(T).fill(0),score:Array(T).fill(0),turn:0,phase:'roll',solved:{},owner:{},
+    cur:null,msg:'',timer:{left:gameSec(cfg),endAt:null},started:false,history:[]};
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+function snapshot(){const {cfg,history,timer,started,...rest}=S;S.history.push(JSON.stringify(rest));if(S.history.length>60)S.history.shift();}
+
+/* ---------- 시작/불러오기 ---------- */
+async function boot(){
+  try{const s=localStorage.getItem(KEY);if(s){S=JSON.parse(s);validate(S.cfg);}}catch(e){S=null;}
+  if(!S){
+    let cfg=null;
+    try{const r=await fetch('game.json',{cache:'no-store'});if(r.ok)cfg=await r.json();}catch(e){}
+    if(!cfg){try{const c=localStorage.getItem(CFG_KEY);if(c)cfg=JSON.parse(c);}catch(e){}}
+    try{if(cfg){validate(cfg);S=freshState(cfg);save();}}catch(e){S=null;}
+  }
+  render();setInterval(tick,250);
+}
+$('fileIn').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  if(S&&!confirm('설정을 바꾸면 진행 중인 게임이 초기화됩니다. 계속할까요?'))return;
+  try{const c=JSON.parse(await f.text());validate(c);S=freshState(c);save();render();}
+  catch(err){alert(err.message);}
+};
+$('btnReset').onclick=()=>{
+  if(!S)return;
+  if(!confirm('게임을 처음부터 초기화합니다. 점수와 소유 정보가 모두 사라집니다. 계속할까요?'))return;
+  S=freshState(S.cfg);save();render();
+};
+$('btnUndo').onclick=()=>{
+  if(!S||busy||!S.history.length)return;
+  const prev=JSON.parse(S.history.pop());
+  S={cfg:S.cfg,history:S.history,timer:S.timer,started:S.started,...prev};showAns=false;save();render();
+};
+$('btnEnd').onclick=()=>{
+  if(!S||S.phase==='ended')return;
+  if(!confirm('게임을 종료하고 최종 순위를 보여줄까요?'))return;
+  snapshot();endGame('manual');
+};
+
+/* ---------- 타이머 ---------- */
+const left=()=>S.timer.endAt?Math.max(0,Math.ceil((S.timer.endAt-Date.now())/1000)):S.timer.left;
+function startTimer(){if(left()<=0)return;beeped=false;S.timer.left=left();S.timer.endAt=Date.now()+S.timer.left*1000;save();paintTimer();}
+function pauseTimer(){S.timer.left=left();S.timer.endAt=null;save();paintTimer();}
+function stopTimer(){pauseTimer();}
+function tick(){
+  if(!S)return;
+  if(S.timer.endAt&&left()<=0){S.timer.left=0;S.timer.endAt=null;beep();endGame('time');}
+  paintTimer();
+}
+function endGame(why){
+  if(S.phase==='ended')return;
+  S.phase='ended';S.endReason=why;pauseTimer();save();render();
+}
+function paintTimer(){
+  const el=$('gt');if(!el||!S)return;
+  const l=left(),m=Math.floor(l/60),s=String(l%60).padStart(2,'0');
+  el.textContent=`${m}:${s}`;
+  el.className='t'+(l===0?' zero':l<=10?' low':'');
+  const run=!!S.timer.endAt;
+  const b=$('gtRun');if(b)b.textContent=run?'⏸':'▶';
+}
+function beep(){
+  if(beeped)return;beeped=true;
+  try{const a=new(window.AudioContext||window.webkitAudioContext)();
+    [0,.25,.5].forEach(t=>{const o=a.createOscillator(),g=a.createGain();o.frequency.value=880;o.connect(g);g.connect(a.destination);
+      g.gain.setValueAtTime(.25,a.currentTime+t);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+t+.2);o.start(a.currentTime+t);o.stop(a.currentTime+t+.22);});}catch(e){}
+}
+function toggleTimer(){if(S.phase==='ended')return;S.timer.endAt?pauseTimer():startTimer();}
+
+/* ---------- 게임 로직 ---------- */
+async function move(steps){
+  if(busy||S.phase!=='roll')return;
+  busy=true;snapshot();
+  if(!S.started){S.started=true;startTimer();}
+  const t=S.turn,start=S.pos[t],n=N();
+  for(let k=1;k<=steps;k++){animPos={team:t,pos:(start+k)%n};renderBoard();await new Promise(r=>setTimeout(r,260));}
+  animPos=null;
+  if(S.phase==='ended'){busy=false;render();return;}
+  const dest=(start+steps)%n;S.pos[t]=dest;
+  const tile=S.cfg.tiles[dest],total=tile.questions.length,done=(S.solved[dest]||[]).length,sc=S.cfg.scoring;
+  S.cur=dest;
+  if(tile.type==='key'){
+    const k=KEYS[Math.floor(Math.random()*KEYS.length)],before=S.score[t];
+    S.score[t]=Math.max(0,before+k.d);S.shown=null;S.phase='result';
+    const diff=S.score[t]-before;
+    S.msg=`🔑 황금열쇠: ${k.t} (${diff>0?'+':''}${diff}점)`;
+  }
+  else if(dest===0||total===0){S.shown=null;S.phase='result';S.msg=dest===0?'출발 칸입니다. 쉬어갑니다.':'문제가 없는 칸입니다. 쉬어갑니다.';}
+  else if(done>=total){
+    S.phase='result';S.shown=null;
+    if(S.owner[dest]===undefined){S.msg='이미 모든 문제가 사용된 칸입니다. 쉬어갑니다.';}
+    else if(S.owner[dest]===t){S.score[t]+=sc.ownerBonus;S.msg=`자기 땅에 도착! +${sc.ownerBonus}점`;}
+    else{const before=S.score[t];S.score[t]=Math.max(0,before-sc.nonOwnerPenalty);
+      S.msg=`${team(S.owner[dest])}의 땅입니다. 통행료 -${before-S.score[t]}점`;}
+  }else{S.phase='question';showAns=false;}
+  busy=false;save();render();
+}
+function judge(ok){
+  if(S.phase!=='question')return;
+  snapshot();
+  const t=S.turn,c=S.cur,sc=S.cfg.scoring,list=S.solved[c]||(S.solved[c]=[]);
+  const qq=S.cfg.tiles[c].questions[list.length];S.shown={q:qq.q,a:qq.a};
+  if(!ok)list.push({team:t,pts:0,ok:false});
+  if(ok){
+    const first=S.owner[c]===undefined,pts=first?sc.first:sc.other;
+    S.score[t]+=pts;list.push({team:t,pts,ok:true});
+    if(first)S.owner[c]=t;
+    S.msg=`정답! +${pts}점${first?' · 이 땅의 소유주가 되었습니다!':''}`;
+  }else{
+    const before=S.score[t];S.score[t]=Math.max(0,before-sc.wrong);
+    S.msg=`오답! -${before-S.score[t]}점`;
+  }
+  S.phase='result';save();render();
+}
+function nextTurn(){
+  if(S.phase!=='result')return;
+  snapshot();S.turn=(S.turn+1)%S.cfg.teams.length;S.phase='roll';S.cur=null;S.msg='';S.shown=null;showAns=false;
+  save();render();
+}
+
+/* ---------- 렌더 ---------- */
+function gridPos(i){
+  const c=S.cfg.cols,r=S.cfg.rows;
+  if(i<c)return[i+1,1];
+  if(i<c+r-1)return[c,i-c+2];
+  if(i<2*c+r-2)return[c-1-(i-(c+r-1)),r];
+  return[1,r-1-(i-(2*c+r-2))];
+}
+function renderBoard(){
+  const {cols,rows,tiles}=S.cfg;
+  const el=$('board');
+  el.style.gridTemplateColumns=`repeat(${cols},minmax(0,1fr))`;
+  el.style.gridTemplateRows=`repeat(${rows},minmax(92px,auto))`;
+  let h='';
+  tiles.forEach((t,i)=>{
+    const[c,r]=gridPos(i),sol=S.solved[i]||[],ow=S.owner[i];
+    const dots=t.questions.map((_,k)=>`<span class="dot" style="${sol[k]?(sol[k].ok===false?'background:#9aa3b2;border-color:#9aa3b2':`background:${COLORS[sol[k].team]};border-color:${COLORS[sol[k].team]}`):''}"></span>`).join('');
+    const toks=S.pos.map((p,ti)=>{const at=(animPos&&animPos.team===ti)?animPos.pos:p;return at===i?`<span class="tok" style="background:${COLORS[ti]}">${ti+1}</span>`:'';}).join('');
+    const cur=S.phase!=='ended'&&((animPos&&animPos.team===S.turn?animPos.pos:S.pos[S.turn])===i);
+    h+=`<div class="tile ${i===0?'start':''} ${t.type==='key'?'key':''}${cur?'cur':''}" style="grid-column:${c};grid-row:${r};${ow!==undefined?`border-color:${COLORS[ow]}`:''}">
+      ${ow!==undefined?`<span class="own" style="border-right-color:${COLORS[ow]}"></span>`:''}
+      <div class="no">${i===0?'출발':i+'번'}</div><div class="nm">${t.type==='key'?'🔑 황금열쇠':esc(t.name||'')}</div>
+      <div class="dots">${dots}</div><div class="tokens">${toks}</div></div>`;
+  });
+  h+=`<div id="center" style="grid-column:2/${cols};grid-row:2/${rows}">${centerHTML()}</div>`;
+  el.innerHTML=h;
+  paintTimer();
+}
+function topbar(){
+  const t=S.turn;
+  return`<div class="topbar"><span class="who" style="background:${COLORS[t]}">${esc(team(t))} 차례</span>
+</div>`;
+}
+function centerHTML(){
+  if(S.phase==='ended')return endHTML();
+  const sc=S.cfg.scoring,t=S.turn;
+  if(S.phase==='roll'){
+    const dice=Array.from({length:6},(_,k)=>`<button ${busy?'disabled':''} onclick="move(${k+1})">${k+1}</button>`).join('');
+    return`${topbar()}<div class="big">주사위 눈(이동할 칸 수)을 선택하세요</div>
+      <div class="dice">${dice}</div>
+      <div class="mute">현재 ${S.pos[t]===0?'출발':S.pos[t]+'번'} 칸 · 시계 방향으로 이동합니다</div>`;
+  }
+  const c=S.cur,tile=S.cfg.tiles[c];
+  if(S.phase==='question'){
+    const sol=S.solved[c]||[],k=sol.length,firstOk=S.owner[c]===undefined,pts=firstOk?sc.first:sc.other;
+    const qq=tile.questions[k];
+    return`${topbar()}
+      <div class="mute">${c}번 칸 ${esc(tile.name||'')} · 문제 ${k+1}/${tile.questions.length} · 정답 시 <b>+${pts}점${firstOk?' + 땅 소유':''}</b> · 오답 시 -${sc.wrong}점</div>
+      <div class="q">${esc(qq.q)}</div>
+      ${showAns?`<div class="ans">정답: <b>${esc(qq.a)}</b></div>`:`<div><button class="sub" onclick="showAns=true;renderBoard()">정답 보기 (교사용)</button></div>`}
+      <div class="row"><button class="ok grow" onclick="judge(true)">⭕ 정답</button><button class="bad grow" onclick="judge(false)">❌ 오답</button></div>`;
+  }
+  const allDone=S.cfg.tiles.every((t,i)=>i===0||!t.questions.length||(S.solved[i]||[]).length>=t.questions.length);
+  return`${topbar()}<div class="big">${esc(S.msg)}</div>
+    ${S.shown?`<div class="q">${esc(S.shown.q)}</div><div class="ans">정답: <b>${esc(S.shown.a)}</b></div>`:''}
+    <div class="mute">${esc(team(t))}: ${S.score[t]}점</div>
+    ${allDone?'<div class="ans">모든 문제가 소진되었습니다. 상단의 [게임 종료]로 결과를 확인하세요.</div>':''}
+    <div><button class="grow" style="font-size:22px;padding:14px 28px" onclick="nextTurn()">다음 모둠 ▶</button></div>`;
+}
+function ranking(){
+  const owned=S.cfg.teams.map((_,i)=>Object.values(S.owner).filter(v=>v===i).length);
+  return S.cfg.teams.map((n,i)=>({i,n,s:S.score[i],o:owned[i]})).sort((a,b)=>b.s-a.s||b.o-a.o);
+}
+function endHTML(){
+  const r=ranking(),medal=['🥇','🥈','🥉'];
+  return`<div class="big">${S.endReason==='time'?'⏰ 시간 종료! ':''}🏆 최종 결과</div>`+r.map((x,k)=>`<div class="rank"><b>${medal[k]||''} ${k+1}위</b>
+    <span class="chip" style="width:16px;height:16px;border-radius:50%;background:${COLORS[x.i]}"></span>
+    <span>${esc(x.n)}</span><span style="margin-left:auto"><b>${x.s}점</b> · 땅 ${x.o}개</span></div>`).join('')
+    +'<div class="mute">다시 시작하려면 [게임 초기화]를 누르세요.</div>';
+}
+function renderSide(){
+  const owned=S.cfg.teams.map((_,i)=>Object.values(S.owner).filter(v=>v===i).length);
+  $('side').innerHTML=S.cfg.teams.map((n,i)=>`<div class="team ${i===S.turn&&S.phase!=='ended'?'on':''}">
+    <div class="nm"><span class="chip" style="background:${COLORS[i]}"></span>${esc(n)}</div>
+    <div class="sc">${S.score[i]}<span style="font-size:16px">점</span></div>
+    <div class="sub2">소유한 땅 ${owned[i]}개 · ${S.pos[i]===0?'출발':S.pos[i]+'번 칸'}</div>
+    <ul class="lands">${Object.keys(S.owner).filter(k=>S.owner[k]===i).map(Number).sort((a,b)=>a-b).map(k=>`<li>${esc(S.cfg.tiles[k].name||k+'번 칸')}</li>`).join('')}</ul></div>`).join('');
+}
+function render(){
+  if(!S){
+    $('board').innerHTML=`<div id="center" style="grid-column:1;padding:30px"><div class="big">설정 파일이 필요합니다</div>
+      <p>교사용 설정 페이지(<b>setup.html</b>)에서 저장한 <b>game.json</b>을 불러오세요.</p>
+      <label class="btn" style="display:inline-block;margin:0;width:fit-content">game.json 불러오기
+      <input type="file" id="fileIn2" accept=".json,application/json" hidden></label></div>`;
+    $('board').style.display='block';$('side').innerHTML='';
+    $('fileIn2').onchange=e=>$('fileIn').onchange(e);
+    return;
+  }
+  $('board').style.display='grid';
+  $('title').textContent=S.cfg.title||'보드게임';
+  $('btnUndo').disabled=!S.history.length;
+  renderSide();renderBoard();
+}
+boot();
+</script>
+</body>
+</html>
