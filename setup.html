@@ -46,7 +46,7 @@ summary .badge.full{color:var(--ok);font-weight:600}
     <div class="grid">
       <div><label>게임 제목</label><input id="title"></div>
       <div><label>전체 게임 시간(분)</label><input id="gameMinutes" type="number" min="1" max="180"></div>
-      <div><label>칸 이름 글자 크기 (10~60px, 기본 32)</label><input id="tileFont" type="number" min="10" max="60"></div>
+      <div><label>칸 이름 글자 크기 (10~60px, 기본 20)</label><input id="tileFont" type="number" min="10" max="60"></div>
     </div>
     <p class="hint" id="tileInfo"></p>
   </section>
@@ -86,7 +86,7 @@ const DRAFT_KEY='bg_setup_draft', CFG_KEY='bg_config';
 const $=id=>document.getElementById(id);
 let cfg=defaults();
 
-function defaults(){return{title:'우리 반 보드게임',cols:6,rows:6,gameMinutes:20,tileFontSize:32,
+function defaults(){return{title:'우리 반 보드게임',cols:6,rows:6,gameMinutes:20,tileFontSize:20,
   teams:['1모둠','2모둠','3모둠','4모둠'],
   scoring:{first:5,other:3,wrong:1,ownerBonus:1,nonOwnerPenalty:1},tiles:[]};}
 
@@ -107,7 +107,7 @@ function fitTiles(){
 function readForm(){
   cfg.title=$('title').value.trim()||'보드게임';
   cfg.gameMinutes=clamp(+$('gameMinutes').value||20,1,180);
-  cfg.tileFontSize=clamp(+$('tileFont').value||32,10,60);
+  cfg.tileFontSize=clamp(+$('tileFont').value||20,10,60);
   cfg.teams=[...document.querySelectorAll('#teams input')].map((i,k)=>i.value.trim()||(k+1)+'모둠');
   const s=cfg.scoring;
   s.first=num('s_first');s.other=num('s_other');s.wrong=num('s_wrong');s.ownerBonus=num('s_bonus');s.nonOwnerPenalty=num('s_pen');
@@ -116,7 +116,7 @@ function num(id){return Math.max(0,+$(id).value||0);}
 function clamp(v,a,b){return Math.min(b,Math.max(a,Math.round(v)||a));}
 
 function writeForm(){
-  $('title').value=cfg.title;$('gameMinutes').value=cfg.gameMinutes||20;$('tileFont').value=cfg.tileFontSize||32;
+  $('title').value=cfg.title;$('gameMinutes').value=cfg.gameMinutes||20;$('tileFont').value=cfg.tileFontSize||20;
   $('teams').innerHTML=cfg.teams.map((t,i)=>`<div><label>${i+1}팀</label><input value="${esc(t)}"></div>`).join('');
   const s=cfg.scoring;
   $('s_first').value=s.first;$('s_other').value=s.other;$('s_wrong').value=s.wrong;$('s_bonus').value=s.ownerBonus;$('s_pen').value=s.nonOwnerPenalty;
