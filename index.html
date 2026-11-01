@@ -116,10 +116,12 @@ $('fileIn').onchange=async e=>{
   try{const c=JSON.parse(await f.text());validate(c);S=freshState(c);save();render();}
   catch(err){alert(err.message);}
 };
-$('btnReset').onclick=()=>{
+$('btnReset').onclick=async()=>{
   if(!S)return;
   if(!confirm('게임을 처음부터 초기화합니다. 점수와 소유 정보가 모두 사라집니다. 계속할까요?'))return;
-  S=freshState(S.cfg);save();render();
+  let cfg=S.cfg;
+  try{const r=await fetch('game.json',{cache:'no-store'});if(r.ok){const c=await r.json();validate(c);cfg=c;}}catch(e){}
+  S=freshState(cfg);save();render();
 };
 $('btnUndo').onclick=()=>{
   if(!S||busy||!S.history.length)return;
@@ -175,7 +177,6 @@ async function move(steps){
   const tile=S.cfg.tiles[dest],total=tile.questions.length,done=(S.solved[dest]||[]).length,sc=S.cfg.scoring;
   S.cur=dest;
   if(tile.type==='key'){
-    const before=S.score[t];
     S.score[t]+=KEY_POINTS;S.shown=null;S.phase='result';
     S.msg=`🔑 황금열쇠! +${KEY_POINTS}점`;
   }
